@@ -1,48 +1,32 @@
 pipeline {
     agent any
 
-    options {
-        skipDefaultCheckout(true)
+    tools {
+        maven 'Maven-3.9'
     }
 
     environment {
-        DOCKERHUB_USERNAME = 'chifve'
-        APP_NAME = 'hello-spring'
-        IMAGE_TAG = 'latest'
+        DOCKERHUB_REPO = 'chifve/hello-spring'
         CONTAINER_NAME = 'hello-app'
-        DOCKER_CRED_ID = 'dockerhub1'
+        APP_PORT = '5252'
     }
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/chifve/hello-spring.git',
-                    credentialsId: DOCKER_CRED_ID
-            }
-        }
-
         stage('Build JAR') {
             steps {
-                sh 'chmod +x mvnw'
-                sh './mvnw clean package -DskipTests'
+                echo '🔨 Compilation de l application...'
+                sh 'mvn clean package'
             }
         }
 
-        stage('Build & Push Docker Image') {
+        stage('Build & Push Docker') {
             steps {
+                echo '🐳 Construction et publication de l image Docker...'
                 script {
-                    withCredentials([
-                        usernamePassword(
-                            credentialsId: DOCKER_CRED_ID,
-                            usernameVariable: 'USER',
-                            passwordVariable: 'PASS'
-                        )
-                    ]) {
-                        sh 'echo "$PASS" | docker login -u "$USER" --password-stdin'
-                        sh 'docker build -t $USER/$APP_NAME:$IMAGE_TAG .'
-                        sh 'docker push $USER/$APP_NAME:$IMAGE_TAG'
+                    // Uses 'docker-hub' credential ID as discussed
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub1') {
+                        def app = docker.build("${DOCKERHUB_REPO}:latest")
+                        app.push()
                     }
                 }
             }
@@ -50,24 +34,31 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh '''
-                    docker stop hello-app || true
-                    docker rm hello-app || true
-                    docker run -d --name hello-app -p 8080:8080 chifve/hello-spring:latest
-                '''
+                echo '🚀 Déploiement de l application...'
+                script {
+                    // Ensures we are logged in to pull the image
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub1') {
+                        sh """
+                            docker stop ${CONTAINER_NAME} || true
+                            docker rm ${CONTAINER_NAME} || true
+                            docker pull ${DOCKERHUB_REPO}:latest
+                            docker run -d \
+                              --name ${CONTAINER_NAME} \
+                              -p ${APP_PORT}:${APP_PORT} \
+                              ${DOCKERHUB_REPO}:latest
+                        """
+                    }
+                }
             }
         }
-    }
+    } // <--- THIS WAS MISSING (Closes 'stages')
 
     post {
-        always {
-            echo 'Pipeline finished'
-        }
         success {
-            echo '✅ Pipeline succeeded'
+            echo '✅ Pipeline exécuté avec succès!'
         }
         failure {
-            echo '❌ Pipeline failed'
+            echo '❌ Le pipeline a échoué.'
         }
     }
-}
+} // (Closes 'pipeline')
