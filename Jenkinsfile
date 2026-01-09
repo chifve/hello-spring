@@ -1,9 +1,14 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'Maven-3.9'
+    }
+
     environment {
         DOCKERHUB_REPO = 'chifve/hello-spring'
         CONTAINER_NAME = 'hello-app'
+        APP_PORT = '8070'
     }
 
     stages {
@@ -34,11 +39,13 @@ pipeline {
                     docker stop ${CONTAINER_NAME} || true
                     docker rm ${CONTAINER_NAME} || true
                     docker pull ${DOCKERHUB_REPO}:latest
-                    docker run -d --name ${CONTAINER_NAME} -p 8080:8080 ${DOCKERHUB_REPO}:latest
+                    docker run -d \
+                      --name ${CONTAINER_NAME} \
+                      -p ${APP_PORT}:${APP_PORT} \
+                      ${DOCKERHUB_REPO}:latest
                 """
             }
         }
-
     }
 
     post {
