@@ -8,7 +8,7 @@ pipeline {
     environment {
         DOCKERHUB_REPO = 'chifve/hello-spring'
         CONTAINER_NAME = 'hello-app'
-        APP_PORT = '8070'
+        APP_PORT = '5252'
     }
 
     stages {
