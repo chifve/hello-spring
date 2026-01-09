@@ -1,32 +1,34 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'Maven-3.9'
-    }
-
     environment {
-        DOCKERHUB_REPO = 'chifve/hello-spring'
+        DOCKERHUB_USERNAME = 'chifve'
+        APP_NAME = 'hello-spring'
+
+        IMAGE_TAG = 'latest'
         CONTAINER_NAME = 'hello-app'
-        APP_PORT = '5252'
+
+        DOCKER_CRED_ID = 'dockerhub'
     }
 
     stages {
-
         stage('Build JAR') {
             steps {
-                echo '🔨 Compilation de l application...'
-                sh 'mvn clean package'
+                echo '🔨 Compilation de l\'application...'
+                bat 'mvnw.cmd clean package -DskipTests'
             }
         }
 
         stage('Build & Push Docker') {
             steps {
-                echo '🐳 Construction et publication de l image Docker...'
+                echo '🐳 Construction et publication de l\'image Docker...'
                 script {
-                    docker.withRegistry('', 'dockerhub') {
-                        def app = docker.build("${DOCKERHUB_REPO}:latest")
-                        app.push()
+                    withCredentials([usernamePassword(credentialsId: DOCKER_CRED_ID, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+
+                        bat 'docker login -u %USER% -p %PASS%'
+
+                        bat "docker build -t %USER%/%APP_NAME%:%IMAGE_TAG% ."
+                        bat "docker push %USER%/%APP_NAME%:%IMAGE_TAG%"
                     }
                 }
             }
@@ -34,21 +36,21 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo '🚀 Déploiement de l application...'
-                sh """
-                    docker stop ${CONTAINER_NAME} || true
-                    docker rm ${CONTAINER_NAME} || true
-                    docker pull ${DOCKERHUB_REPO}:latest
-                    docker run -d \
-                      --name ${CONTAINER_NAME} \
-                      -p ${APP_PORT}:${APP_PORT} \
-                      ${DOCKERHUB_REPO}:latest
+                echo '🚀 Déploiement de l\'application...'
+                bat """
+                    docker stop ${CONTAINER_NAME} || exit 0
+                    docker rm ${CONTAINER_NAME} || exit 0
+                    docker pull ${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG}
+                    docker run -d --name ${CONTAINER_NAME} -p 8080:8080 ${DOCKERHUB_USERNAME}/${APP_NAME}:${IMAGE_TAG}
                 """
             }
         }
     }
 
     post {
+        always {
+            bat 'docker logout'
+        }
         success {
             echo '✅ Pipeline exécuté avec succès!'
         }
