@@ -8,7 +8,7 @@ pipeline {
         IMAGE_TAG = 'latest'
         CONTAINER_NAME = 'hello-app'
 
-        DOCKER_CRED_ID = 'dockerhub'
+        DOCKER_CRED_ID = 'dockerhub1'
     }
 
     stages {
