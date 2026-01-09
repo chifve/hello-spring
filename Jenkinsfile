@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)
+    }
+
     environment {
         DOCKERHUB_USERNAME = 'chifve'
         APP_NAME = 'hello-spring'
@@ -11,9 +15,16 @@ pipeline {
 
     stages {
 
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/chifve/hello-spring.git',
+                    credentialsId: DOCKER_CRED_ID
+            }
+        }
+
         stage('Build JAR') {
             steps {
-                echo '🔨 Building the application...'
                 sh 'chmod +x mvnw'
                 sh './mvnw clean package -DskipTests'
             }
@@ -21,7 +32,6 @@ pipeline {
 
         stage('Build & Push Docker Image') {
             steps {
-                echo '🐳 Building and pushing Docker image...'
                 script {
                     withCredentials([
                         usernamePassword(
@@ -40,12 +50,10 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo '🚀 Deploying the application...'
                 sh '''
-                    docker stop $CONTAINER_NAME || true
-                    docker rm $CONTAINER_NAME || true
-                    docker pull $DOCKERHUB_USERNAME/$APP_NAME:$IMAGE_TAG
-                    docker run -d --name $CONTAINER_NAME -p 8080:8080 $DOCKERHUB_USERNAME/$APP_NAME:$IMAGE_TAG
+                    docker stop hello-app || true
+                    docker rm hello-app || true
+                    docker run -d --name hello-app -p 8080:8080 chifve/hello-spring:latest
                 '''
             }
         }
@@ -53,13 +61,13 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout || true'
+            echo 'Pipeline finished'
         }
         success {
-            echo '✅ Pipeline executed successfully!'
+            echo '✅ Pipeline succeeded'
         }
         failure {
-            echo '❌ Pipeline failed.'
+            echo '❌ Pipeline failed'
         }
     }
 }
