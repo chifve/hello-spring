@@ -1,0 +1,9 @@
+# Git version control
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# CI/CD pipeline files
+Jenkinsfile
